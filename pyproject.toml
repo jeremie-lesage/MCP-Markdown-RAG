@@ -8,4 +8,5 @@ dependencies = [
     "fastmcp>=2.10.2",
     "llama-index>=0.12.45",
     "pymilvus[model]>=2.5.11",
+    "FlagEmbedding>=1.3.3",
 ]

@@ -99,4 +99,4 @@ def get_changed_files(
 def ensure_collection(milvus_client: MilvusClient):
     if milvus_client.has_collection(COLLECTION_NAME):
         return
-    milvus_client.create_collection(COLLECTION_NAME, dimension=768, auto_id=True)
+    milvus_client.create_collection(COLLECTION_NAME, dimension=1024, auto_id=True)

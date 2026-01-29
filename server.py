@@ -5,7 +5,8 @@ from llama_index.core import SimpleDirectoryReader
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.core.text_splitter import TokenTextSplitter
 from pydantic import Field
-from pymilvus import MilvusClient, model
+from pymilvus import MilvusClient
+from pymilvus.model.hybrid import BGEM3EmbeddingFunction
 
 from utils import (
     COLLECTION_NAME,
@@ -20,9 +21,9 @@ from utils import (
 
 mcp = FastMCP(
     "mcp-markdown-rag",
-    instructions="""This MCP server provides semantic search capabilities over markdown files using 
-    vector embeddings and Milvus database. It enables you to index markdown documents and perform 
-    intelligent searches to find relevant content based on semantic similarity rather than just 
+    instructions="""This MCP server provides semantic search capabilities over markdown files using
+    vector embeddings and Milvus database. It enables you to index markdown documents and perform
+    intelligent searches to find relevant content based on semantic similarity rather than just
     keyword matching.""",
 )
 
@@ -30,11 +31,21 @@ mcp = FastMCP(
 if not os.path.exists(INDEX_DATA_PATH):
     os.makedirs(INDEX_DATA_PATH)
 milvus_client = MilvusClient(os.path.join(INDEX_DATA_PATH, "milvus_markdown.db"))
-embedding_fn = model.DefaultEmbeddingFunction()
+
+# Lazy loading for embedding model (BGE-M3 takes ~2min to load)
+_embedding_fn = None
+
+
+def get_embedding_fn():
+    """Load embedding model on first use."""
+    global _embedding_fn
+    if _embedding_fn is None:
+        _embedding_fn = BGEM3EmbeddingFunction(device="cpu", use_fp16=False)
+    return _embedding_fn
 
 
 def search(query: str, k: int) -> list[list[SearchResult]]:
-    query_vectors = embedding_fn.encode_queries([query])
+    query_vectors = get_embedding_fn().encode_queries([query])["dense"]
     res = milvus_client.search(
         collection_name=COLLECTION_NAME,
         data=query_vectors,
@@ -104,7 +115,7 @@ async def index_documents(
 
     # Extract text from nodes and embed
     texts = [node.text for node in chunked_nodes]
-    vectors = embedding_fn.encode_documents(texts)
+    vectors = get_embedding_fn().encode_documents(texts)["dense"]
     data = [
         {
             "vector": vector,
